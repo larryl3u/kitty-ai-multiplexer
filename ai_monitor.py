@@ -8,7 +8,65 @@ import iterm2
 import asyncio
 import re
 from typing import Optional, List
-from config import Config
+
+
+class Config:
+    """Configuration for AI session detection and visualization"""
+
+    POLL_INTERVAL = 2.0
+    LINES_TO_CHECK = 10
+
+    WAITING_PATTERNS = [
+        r'❯\s*$',
+        r'>\s*$',
+        r'\$\s*$',
+        r'Your response:',
+        r'Continue\?',
+        r'\[Y/n\]',
+        r'\[y/N\]',
+        r'Press any key',
+        r'Enter your choice:',
+        r'What would you like to do\?',
+        r'^\s*[>\$#%]\s*$',
+        r'claude>',
+        r'codex>',
+        r'gemini>',
+    ]
+
+    PROCESSING_PATTERNS = [
+        r'●',
+        r'⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏',
+        r'Running',
+        r'Processing',
+        r'Thinking',
+        r'Analyzing',
+        r'Generating',
+        r'Loading',
+        r'\.\.\.',
+        r'Please wait',
+        r'Working on it',
+        r'█+\s*\d+%',
+        r'\[\s*[=>]+\s*\]',
+    ]
+
+    STATE_COLORS = {
+        "waiting": iterm2.Color(0, 200, 0),
+        "processing": iterm2.Color(255, 180, 0),
+        "idle": iterm2.Color(100, 100, 100),
+        "unknown": None,
+    }
+
+    STATE_BADGES = {
+        "waiting": "⏸",
+        "processing": "▶",
+        "idle": "■",
+    }
+
+    SHOW_BADGES = False
+    SHOW_STATE_IN_TITLE = True
+
+    def __init__(self):
+        pass
 
 class TabState:
     """Represents the state of a tab running an AI assistant"""
@@ -165,25 +223,16 @@ async def main(connection):
     asyncio.create_task(monitor.monitor_tabs())
 
     # Register RPC functions for keybindings
-    async def jump_to_waiting_rpc(connection):
+    @iterm2.RPC
+    async def jump_to_waiting():
         await monitor.jump_to_next_waiting()
 
-    async def jump_to_processing_rpc(connection):
+    @iterm2.RPC
+    async def jump_to_processing():
         await monitor.jump_to_next_by_state(TabState.PROCESSING)
 
-    await iterm2.RPC.async_register(
-        connection,
-        "jump_to_waiting",
-        jump_to_waiting_rpc,
-        timeout=1.0
-    )
-
-    await iterm2.RPC.async_register(
-        connection,
-        "jump_to_processing",
-        jump_to_processing_rpc,
-        timeout=1.0
-    )
+    await jump_to_waiting.async_register(connection)
+    await jump_to_processing.async_register(connection)
 
     print("✓ RPC functions registered:")
     print("  - jump_to_waiting")
