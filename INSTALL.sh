@@ -1,45 +1,51 @@
 #!/bin/bash
-# Installation script for iTerm2 AI Multiplexer
+# Installation script for Kitty AI CLI Monitor
 
 set -e
 
-ITERM2_SCRIPTS_DIR="$HOME/Library/Application Support/iTerm2/Scripts/AutoLaunch"
+KITTY_CONF_DIR="$HOME/.config/kitty"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-echo "🚀 Installing iTerm2 AI Multiplexer..."
+echo "Installing Kitty AI CLI Monitor..."
 
-# Check if on macOS
-if [[ "$OSTYPE" != "darwin"* ]]; then
-    echo "❌ Error: This script only works on macOS with iTerm2"
+if ! command -v kitty &>/dev/null; then
+    echo "Error: kitty not found. Please install Kitty terminal first."
     exit 1
 fi
 
-# Check if iTerm2 is installed
-if ! [ -d "/Applications/iTerm.app" ]; then
-    echo "❌ Error: iTerm2 not found. Please install iTerm2 first."
-    echo "   Download from: https://iterm2.com"
-    exit 1
+mkdir -p "$KITTY_CONF_DIR"
+
+cp "$SCRIPT_DIR/ai_monitor.py" "$KITTY_CONF_DIR/"
+cp "$SCRIPT_DIR/ai_jump.py" "$KITTY_CONF_DIR/"
+
+echo "Files installed to $KITTY_CONF_DIR"
+echo ""
+
+# Check if kitty.conf already has the watcher line
+if grep -q "ai_monitor.py" "$KITTY_CONF_DIR/kitty.conf" 2>/dev/null; then
+    echo "kitty.conf already references ai_monitor.py — skipping config update."
+else
+    echo "" >> "$KITTY_CONF_DIR/kitty.conf"
+    echo "# AI CLI Monitor - watcher and keybindings" >> "$KITTY_CONF_DIR/kitty.conf"
+    echo "watcher $KITTY_CONF_DIR/ai_monitor.py" >> "$KITTY_CONF_DIR/kitty.conf"
+    echo "map cmd+shift+n kitten $KITTY_CONF_DIR/ai_jump.py waiting" >> "$KITTY_CONF_DIR/kitty.conf"
+    echo "map cmd+shift+r kitten $KITTY_CONF_DIR/ai_jump.py running" >> "$KITTY_CONF_DIR/kitty.conf"
+    echo "Added watcher and keybindings to kitty.conf"
 fi
 
-# Create scripts directory if it doesn't exist
-mkdir -p "$ITERM2_SCRIPTS_DIR"
-
-# Copy files
-echo "📦 Copying files to $ITERM2_SCRIPTS_DIR..."
-cp ai_monitor.py "$ITERM2_SCRIPTS_DIR/"
-cp config.py "$ITERM2_SCRIPTS_DIR/"
-
-echo "✅ Files installed successfully!"
 echo ""
 echo "Next steps:"
-echo "1. Open iTerm2"
-echo "2. Go to Scripts → Manage → Install Python Runtime (if not already installed)"
-echo "3. Restart iTerm2"
-echo "4. Set up keybinding:"
-echo "   - Settings → Keys → Key Bindings → +"
-echo "   - Keyboard shortcut: ⌘⇧N (or your choice)"
-echo "   - Action: Invoke Script Function"
-echo "   - Function call: jump_to_waiting()"
 echo ""
-echo "5. Start using AI tools in different tabs and watch them auto-color!"
+echo "1. Restart Kitty (or reload config with ctrl+shift+f5)"
 echo ""
-echo "📖 See README.md for full documentation"
+echo "2. Configure hooks on your AI tools."
+echo ""
+echo "   Claude Code (~/.claude/settings.json):"
+echo "   Merge the contents of hooks/claude-code.json"
+echo ""
+echo "   Codex (~/.codex/hooks.json):"
+echo "   Use hooks/codex.json"
+echo ""
+echo "3. Keybindings (already added to kitty.conf):"
+echo "   Cmd+Shift+N  →  jump to next 'waiting' tab"
+echo "   Cmd+Shift+R  →  jump to next 'running' tab"

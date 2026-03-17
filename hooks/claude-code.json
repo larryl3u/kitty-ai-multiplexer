@@ -1,0 +1,60 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "state=running; encoded=$(printf %s \"$state\" | base64); if [ -n \"${TMUX:-}\" ]; then printf '\\033Ptmux;\\033\\033]1337;SetUserVar=%s=%s\\007\\033\\\\' ai_cli_state \"$encoded\" > /dev/tty; else printf '\\033]1337;SetUserVar=%s=%s\\007' ai_cli_state \"$encoded\" > /dev/tty; fi",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "state=running; encoded=$(printf %s \"$state\" | base64); if [ -n \"${TMUX:-}\" ]; then printf '\\033Ptmux;\\033\\033]1337;SetUserVar=%s=%s\\007\\033\\\\' ai_cli_state \"$encoded\" > /dev/tty; else printf '\\033]1337;SetUserVar=%s=%s\\007' ai_cli_state \"$encoded\" > /dev/tty; fi",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "state=waiting; encoded=$(printf %s \"$state\" | base64); if [ -n \"${TMUX:-}\" ]; then printf '\\033Ptmux;\\033\\033]1337;SetUserVar=%s=%s\\007\\033\\\\' ai_cli_state \"$encoded\" > /dev/tty; else printf '\\033]1337;SetUserVar=%s=%s\\007' ai_cli_state \"$encoded\" > /dev/tty; fi",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "state=waiting; encoded=$(printf %s \"$state\" | base64); if [ -n \"${TMUX:-}\" ]; then printf '\\033Ptmux;\\033\\033]1337;SetUserVar=%s=%s\\007\\033\\\\' ai_cli_state \"$encoded\" > /dev/tty; else printf '\\033]1337;SetUserVar=%s=%s\\007' ai_cli_state \"$encoded\" > /dev/tty; fi",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "state=done; encoded=$(printf %s \"$state\" | base64); if [ -n \"${TMUX:-}\" ]; then printf '\\033Ptmux;\\033\\033]1337;SetUserVar=%s=%s\\007\\033\\\\' ai_cli_state \"$encoded\" > /dev/tty; else printf '\\033]1337;SetUserVar=%s=%s\\007' ai_cli_state \"$encoded\" > /dev/tty; fi",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}

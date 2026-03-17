@@ -1,245 +1,48 @@
-#!/usr/bin/env python3
 """
-iTerm2 AI Session Multiplexer
-Monitors tabs for AI coding assistant state and provides smart navigation.
+Kitty watcher for AI CLI state changes.
+
+Loaded by Kitty via kitty.conf:
+    watcher ~/.config/kitty/ai_monitor.py
+
+Reacts to Kitty's `SetUserVar` escape sequence support:
+    printf '\\033]1337;SetUserVar=%s=%s\\007' ai_cli_state $(echo -n waiting | base64)
 """
 
-import iterm2
-import asyncio
-import re
-from typing import Optional, List
+from kitty.rgb import to_color
+
+# ── Config ──────────────────────────────────────────────────────────────
+STATE_COLORS = {
+    "waiting": "#00c800",   # Green  - needs input
+    "running": "#ffb400",   # Orange - working
+}
+# ────────────────────────────────────────────────────────────────────────
+
+def find_tab_by_window_id(boss, target_window_id):
+    for tm in getattr(boss, "all_tab_managers", ()) or ():
+        for tab in tm:
+            for w in tab:
+                if getattr(w, "id", None) == target_window_id:
+                    return tab
+    return None
 
 
-class Config:
-    """Configuration for AI session detection and visualization"""
+def on_set_user_var(boss, window, data):
+    is_dict = isinstance(data, dict)
+    key = data['key'] if is_dict else data.key
+    if key != "ai_cli_state":
+        return
 
-    POLL_INTERVAL = 2.0
-    LINES_TO_CHECK = 10
+    state = data['value'] if is_dict else data.value
+    tab = find_tab_by_window_id(boss, getattr(window, "id", None))
+    if tab is None:
+        return
 
-    WAITING_PATTERNS = [
-        r'❯\s*$',
-        r'>\s*$',
-        r'\$\s*$',
-        r'Your response:',
-        r'Continue\?',
-        r'\[Y/n\]',
-        r'\[y/N\]',
-        r'Press any key',
-        r'Enter your choice:',
-        r'What would you like to do\?',
-        r'^\s*[>\$#%]\s*$',
-        r'claude>',
-        r'codex>',
-        r'gemini>',
-    ]
-
-    PROCESSING_PATTERNS = [
-        r'●',
-        r'⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏',
-        r'Running',
-        r'Processing',
-        r'Thinking',
-        r'Analyzing',
-        r'Generating',
-        r'Loading',
-        r'\.\.\.',
-        r'Please wait',
-        r'Working on it',
-        r'█+\s*\d+%',
-        r'\[\s*[=>]+\s*\]',
-    ]
-
-    STATE_COLORS = {
-        "waiting": iterm2.Color(0, 200, 0),
-        "processing": iterm2.Color(255, 180, 0),
-        "idle": iterm2.Color(100, 100, 100),
-        "unknown": None,
-    }
-
-    STATE_BADGES = {
-        "waiting": "⏸",
-        "processing": "▶",
-        "idle": "■",
-    }
-
-    SHOW_BADGES = False
-    SHOW_STATE_IN_TITLE = True
-
-    def __init__(self):
-        pass
-
-class TabState:
-    """Represents the state of a tab running an AI assistant"""
-    WAITING = "waiting"      # Waiting for user input
-    PROCESSING = "processing"  # Processing/thinking
-    IDLE = "idle"            # Idle or completed
-    UNKNOWN = "unknown"      # Can't determine state
-
-class AITabMonitor:
-    """Monitors iTerm2 tabs for AI session state"""
-
-    def __init__(self, app: iterm2.App, config: Config):
-        self.app = app
-        self.config = config
-        self.tab_states = {}  # tab_id -> state
-
-    async def detect_state(self, session: iterm2.Session) -> str:
-        """Detect the current state of a session"""
-        if not session:
-            return TabState.UNKNOWN
-
-        try:
-            # Get screen content
-            screen = await session.async_get_screen_contents()
-            if not screen:
-                return TabState.UNKNOWN
-
-            # Get last N lines
-            lines = screen.lines[-self.config.LINES_TO_CHECK:]
-            text = "\n".join(line.string for line in lines)
-
-            # Check for waiting patterns (highest priority)
-            for pattern in self.config.WAITING_PATTERNS:
-                if re.search(pattern, text, re.MULTILINE):
-                    return TabState.WAITING
-
-            # Check for processing patterns
-            for pattern in self.config.PROCESSING_PATTERNS:
-                if re.search(pattern, text, re.MULTILINE):
-                    return TabState.PROCESSING
-
-            # Check if process is active (not blocking on input)
-            # If last line is empty or hasn't changed, likely idle
-            return TabState.IDLE
-
-        except Exception as e:
-            print(f"Error detecting state: {e}")
-            return TabState.UNKNOWN
-
-    async def set_tab_color(self, tab: iterm2.Tab, state: str):
-        """Set tab color based on state"""
-        color = self.config.STATE_COLORS.get(state)
-        if color:
-            await tab.async_set_tab_color(color)
-
-    async def set_tab_badge(self, tab: iterm2.Tab, state: str):
-        """Set tab badge/annotation based on state"""
-        if not self.config.SHOW_BADGES:
-            return
-
-        badge = self.config.STATE_BADGES.get(state, "")
-        session = tab.current_session
-        if session and badge:
-            await session.async_set_variable("user.badge", badge)
-
-    async def monitor_tabs(self):
-        """Continuously monitor all tabs and update their appearance"""
-        print("🤖 AI Tab Monitor started")
-        print(f"   Monitoring every {self.config.POLL_INTERVAL}s")
-        print(f"   Colors: {TabState.WAITING}=green, {TabState.PROCESSING}=yellow, {TabState.IDLE}=gray")
-
-        while True:
-            try:
-                for window in self.app.windows:
-                    for tab in window.tabs:
-                        session = tab.current_session
-                        if session:
-                            state = await self.detect_state(session)
-                            self.tab_states[tab.tab_id] = state
-
-                            # Update visual indicators
-                            await self.set_tab_color(tab, state)
-                            await self.set_tab_badge(tab, state)
-
-                            # Optionally update title
-                            if self.config.SHOW_STATE_IN_TITLE:
-                                title = f"{session.name or 'Tab'} [{state}]"
-                                await tab.async_set_title(title)
-
-                await asyncio.sleep(self.config.POLL_INTERVAL)
-
-            except Exception as e:
-                print(f"Error in monitor loop: {e}")
-                await asyncio.sleep(self.config.POLL_INTERVAL)
-
-    async def jump_to_next_waiting(self):
-        """Jump to the next tab that's waiting for input"""
-        window = self.app.current_terminal_window
-        if not window:
-            print("No active window")
-            return
-
-        tabs = window.tabs
-        if not tabs:
-            return
-
-        current_tab = window.current_tab
-        current_idx = tabs.index(current_tab) if current_tab in tabs else -1
-
-        # Search forward from current position, then wrap around
-        for i in range(len(tabs)):
-            idx = (current_idx + i + 1) % len(tabs)
-            tab = tabs[idx]
-
-            state = self.tab_states.get(tab.tab_id, TabState.UNKNOWN)
-
-            if state == TabState.WAITING:
-                await tab.async_select()
-                print(f"✓ Jumped to waiting tab: {tab.title or 'Untitled'}")
-                return
-
-        print("No tabs waiting for input")
-
-    async def jump_to_next_by_state(self, target_state: str):
-        """Jump to next tab with specific state"""
-        window = self.app.current_terminal_window
-        if not window:
-            return
-
-        tabs = window.tabs
-        if not tabs:
-            return
-
-        current_tab = window.current_tab
-        current_idx = tabs.index(current_tab) if current_tab in tabs else -1
-
-        for i in range(len(tabs)):
-            idx = (current_idx + i + 1) % len(tabs)
-            tab = tabs[idx]
-
-            state = self.tab_states.get(tab.tab_id, TabState.UNKNOWN)
-
-            if state == target_state:
-                await tab.async_select()
-                return
-
-async def main(connection):
-    """Main entry point"""
-    app = await iterm2.async_get_app(connection)
-    config = Config()
-    monitor = AITabMonitor(app, config)
-
-    # Start background monitoring task
-    asyncio.create_task(monitor.monitor_tabs())
-
-    # Register RPC functions for keybindings
-    @iterm2.RPC
-    async def jump_to_waiting():
-        await monitor.jump_to_next_waiting()
-
-    @iterm2.RPC
-    async def jump_to_processing():
-        await monitor.jump_to_next_by_state(TabState.PROCESSING)
-
-    await jump_to_waiting.async_register(connection)
-    await jump_to_processing.async_register(connection)
-
-    print("✓ RPC functions registered:")
-    print("  - jump_to_waiting")
-    print("  - jump_to_processing")
-
-    # Keep running
-    await asyncio.Event().wait()
-
-if __name__ == "__main__":
-    iterm2.run_forever(main)
+    color = STATE_COLORS.get(state)
+    if color is not None:
+        value = int(to_color(color))
+        tab.active_bg = value
+        tab.inactive_bg = value
+    else:
+        tab.active_bg = None
+        tab.inactive_bg = None
+    tab.mark_tab_bar_dirty()

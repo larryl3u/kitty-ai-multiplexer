@@ -1,217 +1,79 @@
-# iTerm2 AI Multiplexer
+# Kitty AI Multiplexer
 
-Smart tab management for AI coding assistants (Claude Code, Codex, Gemini, etc.) in iTerm2.
+Smart tab management for AI coding assistants (Claude Code, Codex, Gemini, etc.) in Kitty.
+
+No background daemon — runs natively inside Kitty via the watcher API.
 
 ## Features
 
-- **Automatic tab coloring** based on AI session state
-  - 🟢 Green: Waiting for your input
-  - 🟡 Yellow: Processing/thinking
-  - ⚫ Gray: Idle/completed
-
-- **Smart navigation**
-  - Jump to next tab waiting for input with a single keypress
-  - Works with local and remote (SSH) sessions
-  - Provider-agnostic (Claude, Codex, Gemini, etc.)
-
-- **Visual indicators**
-  - Tab titles show state: `[waiting]`, `[processing]`, `[idle]`
-  - Optional badge icons on tabs
-  - At-a-glance status of all AI sessions
-
-## Installation
-
-### 1. Install iTerm2 Python Runtime
-
-```bash
-iTerm2 → Scripts → Manage → Install Python Runtime
-```
-
-### 2. Install the Script
-
-```bash
-# Copy script to iTerm2 AutoLaunch directory
-mkdir -p ~/Library/Application\ Support/iTerm2/Scripts/AutoLaunch
-cp ai_monitor.py config.py ~/Library/Application\ Support/iTerm2/Scripts/AutoLaunch/
-```
-
-### 3. Restart iTerm2
-
-The script will automatically start monitoring your tabs.
-
-## Setup Keybindings
-
-### Jump to Next Waiting Tab
-
-1. iTerm2 → Settings → Keys → Key Bindings
-2. Click `+` to add new keybinding
-3. Set keyboard shortcut (e.g., `⌘⇧N`)
-4. Action: `Invoke Script Function`
-5. Function call: `jump_to_waiting`
-
-### Optional: Jump to Next Processing Tab
-
-Same as above, but use function call: `jump_to_processing`
-
-## Configuration
-
-Edit `config.py` to customize:
-
-### Detection Patterns
-
-Add patterns for your specific AI tools:
-
-```python
-WAITING_PATTERNS = [
-    r'your-custom-prompt>',
-    # Add more patterns
-]
-
-PROCESSING_PATTERNS = [
-    r'YourAI is thinking',
-    # Add more patterns
-]
-```
-
-### Colors
-
-Customize tab colors:
-
-```python
-STATE_COLORS = {
-    "waiting": iterm2.Color(0, 255, 0),    # RGB values
-    "processing": iterm2.Color(255, 200, 0),
-    "idle": iterm2.Color(128, 128, 128),
-}
-```
-
-### Polling Interval
-
-Adjust how often tabs are checked:
-
-```python
-POLL_INTERVAL = 2.0  # seconds
-```
-
-## Usage
-
-### Starting AI Sessions
-
-Just start your AI assistant in any tab:
-
-```bash
-# Local
-claude code
-
-# Remote
-ssh myserver -t "claude code"
-
-# Any AI tool
-codex
-gemini-code
-```
-
-The monitor automatically detects and tracks state.
-
-### Navigation
-
-- **⌘⇧N** (or your custom binding): Jump to next tab waiting for input
-- Glance at tab bar to see which sessions need attention
-- Tab colors update in real-time
+- **Automatic tab coloring** — green for waiting, orange for running, even when the tab is inactive
+- **Tab title annotations** — `[waiting]` / `[running]` appended to titles
+- **Jump-to-tab keybindings** — hop to the next tab that needs your input
 
 ## How It Works
 
-1. **Background monitoring**: Script polls all tabs every 2 seconds
-2. **Pattern matching**: Analyzes last 10 lines of each tab's output
-3. **State detection**: Matches against patterns for "waiting" vs "processing"
-4. **Visual updates**: Sets tab colors and titles based on detected state
-5. **Smart navigation**: Tracks state and enables "jump to next waiting"
+1. AI tool hooks emit an escape sequence: `\033]1337;SetUserVar=ai_cli_state=<base64>\007`
+2. Kitty's watcher (`ai_monitor.py`) fires `on_set_user_var` and sets tab color/title
+3. A custom kitten (`ai_jump.py`) reads `window.user_vars` to find tabs by state
 
-## Troubleshooting
+No polling, no sockets, no separate process.
 
-### Script not running
+## Install
 
-Check if it's loaded:
 ```bash
-iTerm2 → Scripts → (you should see ai_monitor.py listed)
+./INSTALL.sh
 ```
 
-View logs:
-```bash
-tail -f ~/Library/Application\ Support/iTerm2/Scripts/AutoLaunch/ai_monitor.log
-```
+This copies the watcher and kitten to `~/.config/kitty/` and appends config to `kitty.conf`.
 
-### State detection not working
+Then restart Kitty (or press `ctrl+shift+f5` to reload config).
 
-- Check that your AI tool's prompts match patterns in `config.py`
-- Add custom patterns for your specific tool
-- Increase `LINES_TO_CHECK` if prompts appear higher up
+## Hook Setup
 
-### Colors not showing
+Merge the appropriate hook config into your AI tool's settings:
 
-- Ensure iTerm2 → Settings → Appearance → Tabs → "Show tab colors" is enabled
-- Check that you're using a recent iTerm2 version (3.4+)
+**Claude Code** (`~/.claude/settings.json`) — see `hooks/claude-code.json`
 
-## Architecture
+**Codex** (`~/.codex/hooks.json`) — see `hooks/codex.json`
 
-```
-ai_monitor.py          # Main monitoring script
-├── AITabMonitor       # Core monitoring class
-│   ├── detect_state() # Pattern matching for state detection
-│   ├── monitor_tabs() # Background polling loop
-│   └── jump_to_*()    # Navigation functions
-└── main()             # Entry point, RPC registration
+The hooks use Kitty's native `SetUserVar` escape sequence support.
 
-config.py              # User-configurable patterns and colors
-└── Config             # Configuration class
-```
+## Keybindings
 
-## Extending
+Added to `kitty.conf` by the installer:
 
-### Add Support for New AI Tool
+| Shortcut | Action |
+|---|---|
+| `Cmd+Shift+N` | Jump to next **waiting** tab |
+| `Cmd+Shift+R` | Jump to next **running** tab |
 
-Edit `config.py`:
+## State Model
+
+This project does not inspect terminal output and does not do pattern matching.
+
+It only reacts to explicit `ai_cli_state` values emitted by your hooks:
+
+- `running` — work is in progress
+- `waiting` — the tool is blocked on your input
+
+If you emit any other value, the watcher clears the tab color and still appends that state to the title.
+
+## Configuration
+
+Edit the top of `~/.config/kitty/ai_monitor.py`:
 
 ```python
-WAITING_PATTERNS = [
-    r'your-ai-tool>',  # Add tool's prompt pattern
-]
-
-PROCESSING_PATTERNS = [
-    r'YourAI: Thinking',  # Add processing indicators
-]
+STATE_COLORS = {
+    "waiting": 0x00C800,    # Green
+    "running": 0xFFB400,    # Orange
+}
+SHOW_STATE_IN_TITLE = True
 ```
 
-### Custom State Logic
+## Requirements
 
-Modify `detect_state()` in `ai_monitor.py` for advanced detection:
-
-```python
-async def detect_state(self, session: iterm2.Session) -> str:
-    # Add custom logic here
-    # e.g., check process name, environment variables, etc.
-    pass
-```
-
-## Limitations
-
-- **Pattern-based detection**: May have false positives/negatives
-- **Polling delay**: 2-second delay before state updates
-- **iTerm2 only**: Doesn't work with other terminals
-- **Local analysis**: Can't detect state from SSH'd AI sessions' internal state (relies on output patterns)
-
-## Future Improvements
-
-- [ ] Escape sequence protocol for AI tools to emit state directly
-- [ ] Support for Ghostty, Wezterm, other terminals
-- [ ] Machine learning-based state detection
-- [ ] Integration with AI tool APIs for accurate state
-- [ ] Tmux integration for remote session persistence
+- Kitty 0.30.0+ (for `on_set_user_var` watcher support)
 
 ## License
 
 MIT
-
-## Contributing
-
-Issues and PRs welcome! Add patterns for new AI tools, improve detection logic, etc.

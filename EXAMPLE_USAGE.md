@@ -2,150 +2,59 @@
 
 ## Typical Workflow
 
-### Scenario: Working on a new feature across multiple AI assistants
+### Scenario: Working across multiple AI tabs
 
-**Tab 1 - Claude Code (local)**
+**Tab 1 - Claude Code**
 ```bash
-claude code
-# State: [waiting] - Tab color: 🟢 Green
-> "Add user authentication to the API"
-# State: [processing] - Tab color: 🟡 Yellow
-# ... Claude is working ...
-# State: [waiting] - Tab color: 🟢 Green
-> Continue? [Y/n]
+# Claude emits:
+printf '\033]1337;SetUserVar=%s=%s\007' ai_cli_state $(echo -n running | base64)
+
+# Kitty shows:
+# - tab color: orange
+# - tab title suffix: [running]
+
+# Claude later needs input and emits:
+printf '\033]1337;SetUserVar=%s=%s\007' ai_cli_state $(echo -n waiting | base64)
+
+# Kitty shows:
+# - tab color: green
+# - tab title suffix: [waiting]
 ```
 
-**Tab 2 - Remote server running tests**
+**Tab 2 - Codex**
 ```bash
-ssh prod-server -t "codex"
-# State: [processing] - Tab color: 🟡 Yellow
-# Running tests...
-# ... Tests complete ...
-# State: [waiting] - Tab color: 🟢 Green
-> Tests failed. Fix? [Y/n]
-```
-
-**Tab 3 - Gemini for documentation**
-```bash
-gemini-code
-# State: [idle] - Tab color: ⚫ Gray
-# Completed earlier task
+# SessionStart hook emits running
+# Stop hook emits waiting
 ```
 
 ### Using Smart Navigation
 
-1. You're in Tab 1, Claude asks for confirmation
-2. You switch to Tab 3 to check something
-3. Meanwhile, Tab 2 finishes tests and needs input
-4. Press **⌘⇧N** → Instantly jumps to Tab 2 (next waiting)
-5. Handle Tab 2, press **⌘⇧N** again → Jumps back to Tab 1 (still waiting)
+1. Claude switches its tab to `waiting`
+2. You stay in another tab
+3. The Claude tab remains green because both active and inactive tab backgrounds are updated
+4. Press `Cmd+Shift+N`
+5. Kitty jumps to the next tab whose `ai_cli_state` is `waiting`
 
-### Visual Overview
+## Custom Tool Integration
 
-Just glance at your tab bar:
+Any tool can integrate as long as it writes Kitty's `SetUserVar` escape sequence to the controlling TTY.
 
-```
-[Tab 1: Claude]     [Tab 2: Tests]      [Tab 3: Docs]
-🟢 waiting          🟡 processing       ⚫ idle
-```
-
-You immediately know:
-- Tab 1 needs your attention
-- Tab 2 is still working
-- Tab 3 is done
-
-## Advanced Patterns
-
-### Multi-stage Pipeline
-
-Run parallel tasks, jump between them as they need input:
+### Mark a tab as running
 
 ```bash
-# Tab 1: Frontend build
-npm run build:watch
-# 🟡 processing
-
-# Tab 2: Backend tests
-pytest --watch
-# 🟡 processing
-
-# Tab 3: Claude Code - implementing feature
-claude code
-# 🟢 waiting - needs your input
-
-# Tab 4: Remote deployment
-ssh deploy-server -t "deploy-script"
-# 🟡 processing
+printf '\033]1337;SetUserVar=%s=%s\007' ai_cli_state $(echo -n running | base64) > /dev/tty
 ```
 
-Press **⌘⇧N** repeatedly to cycle through all tabs needing input, skipping the ones still processing.
-
-### Remote Development
-
-All tabs are remote SSH sessions to different servers:
+### Mark a tab as waiting
 
 ```bash
-# Tab 1: Dev server - Claude Code
-ssh dev -t "claude code"
-
-# Tab 2: Staging server - Running tests
-ssh staging -t "pytest"
-
-# Tab 3: Prod server - Monitoring
-ssh prod -t "watch -n 1 'kubectl get pods'"
+printf '\033]1337;SetUserVar=%s=%s\007' ai_cli_state $(echo -n waiting | base64) > /dev/tty
 ```
 
-The monitor works identically - it doesn't care if the process is local or remote.
+### Clear the color with another state
 
-## Customizing for Your Tools
-
-### Example: Custom AI Tool
-
-You have a custom AI assistant called `myai` with prompts like:
-
-```
-MyAI> Your command?
+```bash
+printf '\033]1337;SetUserVar=%s=%s\007' ai_cli_state $(echo -n done | base64) > /dev/tty
 ```
 
-Add to `config.py`:
-
-```python
-WAITING_PATTERNS = [
-    r'MyAI>\s*$',  # Your custom prompt
-    # ... other patterns
-]
-```
-
-### Example: Build Tool Integration
-
-You want to track build status:
-
-```python
-PROCESSING_PATTERNS = [
-    r'Building\.\.\.',
-    r'Compiling \d+/\d+',
-    # ... other patterns
-]
-
-WAITING_PATTERNS = [
-    r'Build failed\. Retry\?',
-    r'Build complete\. Deploy\?',
-    # ... other patterns
-]
-```
-
-## Tips
-
-1. **Start AI sessions in background**: Open multiple tabs, start your AI tools, let them all work in parallel
-
-2. **Use descriptive tab names**: Right-click tab → Edit Session → Set title manually (or let the script append state)
-
-3. **Combine with tmux for remote persistence**:
-   ```bash
-   ssh server -t "tmux new -A -s ai 'claude code'"
-   ```
-   Session persists even if connection drops
-
-4. **Monitor long-running tasks**: Start a task, switch away, get notified (via color) when it needs you
-
-5. **Batch operations**: Start 5 different AI tasks in 5 tabs, handle them as they complete rather than waiting serially
+The watcher only assigns colors to `running` and `waiting`. Other values keep the title annotation but clear the configured tab color.
