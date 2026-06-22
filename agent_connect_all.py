@@ -40,4 +40,4 @@ def handle_result(args, answer, target_window_id, boss):
     for name in list_remote_sessions():
         if name in have:
             continue
-        launch_agent_tab(boss, name)
+        launch_agent_tab(boss, name, create=False)

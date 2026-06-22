@@ -35,7 +35,7 @@ No daemon, no protocol, no orchestrator process. Just Kitty + tmux + ssh.
 Sets your remote (optional but typical):
 
 ```bash
-export KITTY_AGENT_REMOTE=devbox   # in your shell rc
+export KITTY_AGENT_REMOTE=larry@reverse-proxy   # in your shell rc
 # or edit ~/.config/kitty/agent_config.py
 ```
 

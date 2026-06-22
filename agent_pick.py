@@ -66,4 +66,4 @@ def handle_result(args, answer, target_window_id, boss):
             if existing in list(tm):
                 tm.set_active_tab(existing)
                 return
-    launch_agent_tab(boss, name)
+    launch_agent_tab(boss, name, create=False)
