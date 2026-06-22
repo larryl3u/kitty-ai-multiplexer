@@ -11,6 +11,6 @@ import os
 # user@host, Tailscale magicDNS name, etc.).
 REMOTE_HOST = os.environ.get("KITTY_AGENT_REMOTE", "larry@reverse-proxy")
 
-# Command run inside each new tmux session. Override per-tab by passing a
-# different command to agent_create; this is just the default.
-AGENT_COMMAND = os.environ.get("KITTY_AGENT_CMD", "claude")
+# Optional command run inside each new tmux session. Empty means start the
+# remote user's default shell and let the user choose codex/claude/manually.
+AGENT_COMMAND = os.environ.get("KITTY_AGENT_CMD", "")

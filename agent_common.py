@@ -104,19 +104,26 @@ def remote_tmux_command(name, command=None, create=True):
     if not create:
         return "exec tmux attach-session -t {n}".format(n=shquote(name))
 
-    cmd = command or AGENT_COMMAND
-    agent_cmd = (
-        "{cmd}; status=$?; "
-        "printf '\\n[agent exited with status %s; keeping shell open]\\n' \"$status\"; "
-        "exec \"${{SHELL:-sh}}\""
-    ).format(cmd=cmd)
+    cmd = command if command is not None else AGENT_COMMAND
+    new_session = "tmux new-session -d -s {n}".format(n=shquote(name))
+    if cmd:
+        agent_cmd = (
+            "{cmd}; status=$?; "
+            "printf '\\n[command exited with status %s; keeping shell open]\\n' "
+            "\"$status\"; "
+            "exec \"${{SHELL:-sh}}\""
+        ).format(cmd=cmd)
+        new_session = "tmux new-session -d -s {n} {agent}".format(
+            n=shquote(name),
+            agent=shquote('exec "${SHELL:-sh}" -lc ' + shquote(agent_cmd)),
+        )
     return (
         "tmux has-session -t {n} 2>/dev/null "
-        "|| tmux new-session -d -s {n} {agent}; "
+        "|| {new_session}; "
         "exec tmux attach-session -t {n}"
     ).format(
         n=shquote(name),
-        agent=shquote('exec "${SHELL:-sh}" -lc ' + shquote(agent_cmd)),
+        new_session=new_session,
     )
 
 

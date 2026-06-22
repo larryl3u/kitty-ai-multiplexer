@@ -3,7 +3,7 @@
 Two complementary layers, both 100% client-side in Kitty:
 
 - **Status layer** — AI tools (Claude Code, Codex, …) emit state via hooks; Kitty colors the tab and lets you jump to whichever tab needs your attention.
-- **Lifecycle layer** — `create / connect_all / pick / end / rename` kittens that manage isolated agent workspaces as remote tmux sessions. The remote is a dumb session store; every Kitty client brings the smarts.
+- **Lifecycle layer** — `create / connect_all / pick / end / rename` kittens that manage isolated remote tmux sessions. The remote is a dumb session store; every Kitty client brings the smarts.
 
 No daemon, no protocol, no orchestrator process. Just Kitty + tmux + ssh.
 
@@ -15,9 +15,9 @@ No daemon, no protocol, no orchestrator process. Just Kitty + tmux + ssh.
 │  ──────────────────────────│         │  ──────────────────────────│
 │  ai_monitor.py  (watcher)  │         │                            │
 │  ai_jump.py     (kitten)   │         │   tmux session "planner"   │
-│  agent_*.py     (kittens)  │  ssh ── │     ↳ claude               │
+│  agent_*.py     (kittens)  │  ssh ── │     ↳ shell / codex / claude│
 │                            │         │   tmux session "refactor"  │
-│  Tab title = session name  │         │     ↳ claude               │
+│  Tab title = session name  │         │     ↳ shell / codex / claude│
 └────────────────────────────┘         └────────────────────────────┘
 ```
 
@@ -58,7 +58,7 @@ On macOS, install maps this project to `cmd+shift`. Elsewhere, install uses
 
 | Key | Verb | Behavior |
 |---|---|---|
-| `c` | **create** | Prompt for name, spawn remote `tmux new -A -s <name> claude`, open a Kitty tab attached to it |
+| `c` | **create** | Prompt for name, create/open remote tmux session, then you choose `codex`, `claude`, cwd, etc. |
 | `a` | **connect_all** | For every live remote session not already a tab, open a tab attached to it |
 | `l` | **list / pick** | Numbered picker over `tmux ls`; selecting attaches in a new tab (or focuses an existing one) |
 | `k` | **kill** | Picker + confirm → `tmux kill-session -t <name>` on the remote |
