@@ -37,6 +37,8 @@ def handle_result(args, answer, target_window_id, boss):
     from agent_common import boss_rc, ssh
 
     if old_name and old_name != new_name:
-        ssh("tmux", "rename-session", "-t", old_name, new_name)
+        result = ssh("tmux", "rename-session", "-t", old_name, new_name)
+        if result.returncode != 0:
+            return
 
     boss_rc(boss, "set-tab-title", new_name)

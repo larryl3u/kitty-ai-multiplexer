@@ -37,6 +37,13 @@ else
 fi
 echo "Using remote: $REMOTE_HOST"
 
+if [ "$(uname -s)" = "Darwin" ]; then
+    KAM_MOD="cmd+shift"
+else
+    KAM_MOD="kitty_mod"
+fi
+echo "Using shortcut modifier: $KAM_MOD"
+
 for f in ai_monitor.py ai_jump.py \
          agent_config.py agent_common.py \
          agent_create.py agent_connect_all.py \
@@ -67,12 +74,10 @@ env KITTY_AGENT_REMOTE=$REMOTE_HOST
 watcher $KITTY_CONF_DIR/ai_monitor.py
 
 # Flat: highest-frequency action — jump to next tab waiting for input.
-# kitty_mod is Kitty's cross-platform modifier (ctrl+shift by default,
-# remappable per-platform via 'kitty_mod' in kitty.conf).
-map kitty_mod+n kitten $KITTY_CONF_DIR/ai_jump.py waiting
+map $KAM_MOD+n kitten $KITTY_CONF_DIR/ai_jump.py waiting
 
 # Agent leader chord: every lifecycle verb under one mnemonic root.
-#   kitty_mod+a then …
+#   $KAM_MOD+a then …
 #     c  create   — prompt for name, spawn remote tmux + local tab
 #     a  attach   — connect_all: rehydrate one tab per live remote session
 #     l  list     — picker over remote sessions, attach selection
@@ -80,13 +85,13 @@ map kitty_mod+n kitten $KITTY_CONF_DIR/ai_jump.py waiting
 #     r  rename   — rename current tab + matching remote session
 #     n  next-waiting (alternate access)
 #     p  next-running
-map kitty_mod+a>c kitten $KITTY_CONF_DIR/agent_create.py
-map kitty_mod+a>a kitten $KITTY_CONF_DIR/agent_connect_all.py
-map kitty_mod+a>l kitten $KITTY_CONF_DIR/agent_pick.py
-map kitty_mod+a>k kitten $KITTY_CONF_DIR/agent_end.py
-map kitty_mod+a>r kitten $KITTY_CONF_DIR/agent_rename.py
-map kitty_mod+a>n kitten $KITTY_CONF_DIR/ai_jump.py waiting
-map kitty_mod+a>p kitten $KITTY_CONF_DIR/ai_jump.py running
+map $KAM_MOD+a>c kitten $KITTY_CONF_DIR/agent_create.py
+map $KAM_MOD+a>a kitten $KITTY_CONF_DIR/agent_connect_all.py
+map $KAM_MOD+a>l kitten $KITTY_CONF_DIR/agent_pick.py
+map $KAM_MOD+a>k kitten $KITTY_CONF_DIR/agent_end.py
+map $KAM_MOD+a>r kitten $KITTY_CONF_DIR/agent_rename.py
+map $KAM_MOD+a>n kitten $KITTY_CONF_DIR/ai_jump.py waiting
+map $KAM_MOD+a>p kitten $KITTY_CONF_DIR/ai_jump.py running
 $MARK_END
 EOF
 echo "Updated managed block in $KITTY_CONF"
@@ -99,12 +104,12 @@ Next steps:
   2. Install AI tool hooks (see hooks/claude-code.json and hooks/codex.json).
 
 Shortcuts:
-  kitty_mod+n        jump to next waiting tab
-  kitty_mod+a c      create a new agent (prompts for name)
-  kitty_mod+a a      connect to all remote sessions (rehydrate)
-  kitty_mod+a l      pick a session to attach
-  kitty_mod+a k      pick a session to kill (with confirm)
-  kitty_mod+a r      rename current tab + remote session
+  $KAM_MOD+n        jump to next waiting tab
+  $KAM_MOD+a c      create a new agent (prompts for name)
+  $KAM_MOD+a a      connect to all remote sessions (rehydrate)
+  $KAM_MOD+a l      pick a session to attach
+  $KAM_MOD+a k      pick a session to kill (with confirm)
+  $KAM_MOD+a r      rename current tab + remote session
 
-kitty_mod defaults to ctrl+shift on Linux and is whatever you set on macOS.
+On macOS, install uses cmd+shift for this project. Elsewhere, it uses kitty_mod.
 EOF

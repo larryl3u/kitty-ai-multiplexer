@@ -11,14 +11,12 @@ printf '\033]1337;SetUserVar=%s=%s\007' ai_cli_state $(echo -n running | base64)
 
 # Kitty shows:
 # - tab color: orange
-# - tab title suffix: [running]
 
 # Claude later needs input and emits:
 printf '\033]1337;SetUserVar=%s=%s\007' ai_cli_state $(echo -n waiting | base64)
 
 # Kitty shows:
 # - tab color: green
-# - tab title suffix: [waiting]
 ```
 
 **Tab 2 - Codex**
@@ -57,4 +55,4 @@ printf '\033]1337;SetUserVar=%s=%s\007' ai_cli_state $(echo -n waiting | base64)
 printf '\033]1337;SetUserVar=%s=%s\007' ai_cli_state $(echo -n done | base64) > /dev/tty
 ```
 
-The watcher only assigns colors to `running` and `waiting`. Other values keep the title annotation but clear the configured tab color.
+The watcher only assigns colors to `running` and `waiting`. Other values clear the configured tab color.

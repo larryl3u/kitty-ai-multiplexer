@@ -23,8 +23,8 @@ No daemon, no protocol, no orchestrator process. Just Kitty + tmux + ssh.
 
 - Agent sessions live in tmux on the remote (per-agent session). Their survival is independent of any client.
 - Every Kitty client is a thin viewer that maps `tmux ls` ↔ Kitty tabs.
-- Recoverability: lose a client → next client runs `kitty_mod+a a` (connect_all) and is back where you were. Agents never noticed.
-- Cross-platform: bindings use `kitty_mod`, so the same install works on Linux and macOS without per-platform edits.
+- Recoverability: lose a client → next client runs the connect_all shortcut and is back where you were. Agents never noticed.
+- Cross-platform: install chooses the platform-appropriate shortcut modifier.
 
 ## Install
 
@@ -45,15 +45,16 @@ For per-tool AI hooks, see `hooks/claude-code.json` and `hooks/codex.json`.
 
 ## Shortcuts
 
-All bindings use `kitty_mod` (Kitty's cross-platform modifier — `ctrl+shift` on Linux by default).
+On macOS, install maps this project to `cmd+shift`. Elsewhere, install uses
+`kitty_mod` (Kitty's configurable modifier, usually `ctrl+shift`).
 
 ### Flat — highest frequency
 
 | Shortcut | Action |
 |---|---|
-| `kitty_mod+n` | Jump to next tab in `waiting` state |
+| `cmd+shift+n` on macOS, `kitty_mod+n` elsewhere | Jump to next tab in `waiting` state |
 
-### Leader chord — `kitty_mod+a`, then…
+### Leader chord — `cmd+shift+a` on macOS, `kitty_mod+a` elsewhere, then…
 
 | Key | Verb | Behavior |
 |---|---|---|
@@ -62,12 +63,12 @@ All bindings use `kitty_mod` (Kitty's cross-platform modifier — `ctrl+shift` o
 | `l` | **list / pick** | Numbered picker over `tmux ls`; selecting attaches in a new tab (or focuses an existing one) |
 | `k` | **kill** | Picker + confirm → `tmux kill-session -t <name>` on the remote |
 | `r` | **rename** | Rename the current tab and the matching remote session together |
-| `n` | jump waiting | Alternate access to `kitty_mod+n` |
+| `n` | jump waiting | Alternate access to next waiting |
 | `p` | jump running | Jump to next tab in `running` state |
 
 ### Ending an agent (normal path)
 
-Just exit it from inside — type `exit` or `Ctrl+D` in the agent's tab. The tmux session dies, the ssh drops, the tab closes. No shortcut needed; `kitty_mod+a k` is reserved for the forced case when you can't get into the session.
+Just exit it from inside — type `exit` or `Ctrl+D` in the agent's tab. The tmux session dies, the ssh drops, the tab closes. No shortcut needed; the kill shortcut is reserved for the forced case when you can't get into the session.
 
 ## Status Layer (existing)
 
