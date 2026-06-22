@@ -24,12 +24,10 @@ fi
 
 mkdir -p "$KITTY_CONF_DIR"
 
-# Remote host. Reuses env/config/default without prompting so installs are
-# deterministic from automation and keyboard-triggered workflows.
-PREV_REMOTE=$(grep -E "^env KITTY_AGENT_REMOTE=" "$KITTY_CONF_DIR/kitty.conf" 2>/dev/null \
-              | tail -n1 | sed -E 's/^env KITTY_AGENT_REMOTE=//')
-DEFAULT_REMOTE="${KITTY_AGENT_REMOTE:-${PREV_REMOTE:-larry@reverse-proxy}}"
-REMOTE_HOST="$DEFAULT_REMOTE"
+# Remote host installed into kitty.conf. Keep this independent from the current
+# shell's KITTY_AGENT_REMOTE because Kitty exports that env var to child shells;
+# reusing it would preserve stale installs forever.
+REMOTE_HOST="larry@reverse-proxy"
 echo "Using remote: $REMOTE_HOST"
 
 if [ "$(uname -s)" = "Darwin" ]; then

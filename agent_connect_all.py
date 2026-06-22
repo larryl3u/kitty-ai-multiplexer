@@ -33,6 +33,7 @@ def handle_result(args, answer, target_window_id, boss):
     from agent_common import (  # local import — boss process
         kitty_tabs_by_title,
         launch_agent_tab,
+        launch_message_tab,
         list_remote_sessions_result,
         log_debug,
     )
@@ -40,10 +41,32 @@ def handle_result(args, answer, target_window_id, boss):
     result = list_remote_sessions_result()
     if result.error:
         log_debug("connect_all skipped: " + result.error)
+        launch_message_tab(
+            boss,
+            "agent connect error",
+            "Could not list remote tmux sessions:\n\n" + result.error,
+        )
+        return
+
+    if not result.sessions:
+        launch_message_tab(
+            boss,
+            "no agent sessions",
+            "No tmux sessions on remote. Use create first.",
+        )
         return
 
     have = set(kitty_tabs_by_title(boss).keys())
+    opened = 0
     for name in result.sessions:
         if name in have:
             continue
         launch_agent_tab(boss, name, create=False)
+        opened += 1
+
+    if opened == 0:
+        launch_message_tab(
+            boss,
+            "agents already attached",
+            "All remote tmux sessions already have Kitty tabs.",
+        )

@@ -27,6 +27,7 @@ class SessionList:
 
 def ssh(*remote_argv, capture=True, check=False, timeout=SSH_TIMEOUT_SECONDS):
     """Fire-and-forget ssh for remote tmux queries."""
+    remote_command = " ".join(shquote(arg) for arg in remote_argv)
     argv = [
         "ssh",
         "-o",
@@ -36,7 +37,7 @@ def ssh(*remote_argv, capture=True, check=False, timeout=SSH_TIMEOUT_SECONDS):
         "-o",
         "ConnectionAttempts=1",
         REMOTE_HOST,
-        *remote_argv,
+        remote_command,
     ]
     try:
         if capture:
@@ -117,6 +118,26 @@ def launch_agent_tab(boss, name, command=None, create=True):
         "-t",
         REMOTE_HOST,
         remote_cmd,
+    )
+    return True
+
+
+def launch_message_tab(boss, title, message):
+    """Open a held local tab with a diagnostic message."""
+    local_cmd = (
+        "printf '%s\\n' {message}; "
+        "printf '\\nPress Ctrl-D or type exit to close.\\n'; "
+        "exec \"${{SHELL:-sh}}\""
+    ).format(message=shquote(message))
+    boss_rc(
+        boss,
+        "launch",
+        "--type=tab",
+        "--hold",
+        "--tab-title=" + title,
+        "sh",
+        "-lc",
+        local_cmd,
     )
     return True
 
