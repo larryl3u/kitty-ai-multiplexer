@@ -1,34 +1,30 @@
 # Kitty AI Multiplexer
 
-Smart tab management for AI coding assistants (Claude Code, Codex, Gemini, etc.) in Kitty.
+Two complementary layers, both 100% client-side in Kitty:
 
-No background daemon — runs natively inside Kitty via the watcher API.
+- **Status layer** — AI tools (Claude Code, Codex, …) emit state via hooks; Kitty colors the tab and lets you jump to whichever tab needs your attention.
+- **Lifecycle layer** — `create / connect_all / pick / end / rename` kittens that manage isolated agent workspaces as remote tmux sessions. The remote is a dumb session store; every Kitty client brings the smarts.
 
-## Features
+No daemon, no protocol, no orchestrator process. Just Kitty + tmux + ssh.
 
-- **Automatic tab coloring** — green for waiting, orange for running, even when the tab is inactive
-- **Jump-to-tab keybindings** — hop to the next tab that needs your input
-- **Works across transport layers** — local shells, SSH sessions, and tmux over SSH
+## Architecture
 
-## How It Works
+```
+┌────────────────────────────┐         ┌────────────────────────────┐
+│  Local Kitty (each client) │         │  Remote machine            │
+│  ──────────────────────────│         │  ──────────────────────────│
+│  ai_monitor.py  (watcher)  │         │                            │
+│  ai_jump.py     (kitten)   │         │   tmux session "planner"   │
+│  agent_*.py     (kittens)  │  ssh ── │     ↳ claude               │
+│                            │         │   tmux session "refactor"  │
+│  Tab title = session name  │         │     ↳ claude               │
+└────────────────────────────┘         └────────────────────────────┘
+```
 
-1. AI tool hooks emit an escape sequence: `\033]1337;SetUserVar=ai_cli_state=<base64>\007`
-2. Kitty's watcher (`ai_monitor.py`) fires `on_set_user_var` and sets tab color
-3. A custom kitten (`ai_jump.py`) reads `window.user_vars` to find tabs by state
-
-No polling, no sockets, no separate process.
-
-## Supported Setups
-
-The watcher only cares that `ai_cli_state` reaches Kitty. That means the same install works for:
-
-| Environment | Claude Code | Codex | Notes |
-|---|---|---|---|
-| Local shell in Kitty | Yes | Yes | Run the CLI directly in a Kitty tab |
-| SSH session in Kitty | Yes | Yes | Run the CLI on the remote host inside a Kitty SSH session |
-| tmux inside SSH inside Kitty | Yes | Yes | Supported by the tmux-aware hook snippets in `hooks/*.json` |
-
-For tmux sessions, the provided hooks detect `TMUX` and emit the escape sequence through tmux passthrough so it still reaches Kitty.
+- Agent sessions live in tmux on the remote (per-agent session). Their survival is independent of any client.
+- Every Kitty client is a thin viewer that maps `tmux ls` ↔ Kitty tabs.
+- Recoverability: lose a client → next client runs `kitty_mod+a a` (connect_all) and is back where you were. Agents never noticed.
+- Cross-platform: bindings use `kitty_mod`, so the same install works on Linux and macOS without per-platform edits.
 
 ## Install
 
@@ -36,102 +32,86 @@ For tmux sessions, the provided hooks detect `TMUX` and emit the escape sequence
 ./INSTALL.sh
 ```
 
-This copies the watcher and kitten to `~/.config/kitty/` and appends config to `kitty.conf`.
-
-Then restart Kitty (or press `ctrl+shift+f5` to reload config).
-
-## Hook Setup
-
-Merge the appropriate hook config into your AI tool's settings:
-
-**Claude Code** (`~/.claude/settings.json`) — see `hooks/claude-code.json`
-
-**Codex** (`~/.codex/hooks.json`) — see `hooks/codex.json`
-
-The hooks use Kitty's native `SetUserVar` escape sequence support and already handle both plain terminals and tmux sessions.
-
-## Usage Patterns
-
-Open each assistant in its own Kitty tab. Any of these layouts are supported.
-
-### Local
+Sets your remote (optional but typical):
 
 ```bash
-# Tab 1
-claude
-
-# Tab 2
-codex
+export KITTY_AGENT_REMOTE=devbox   # in your shell rc
+# or edit ~/.config/kitty/agent_config.py
 ```
 
-### SSH
+Restart Kitty (or `ctrl+shift+f5`).
 
-```bash
-# Tab 1
-ssh devbox
-claude
+For per-tool AI hooks, see `hooks/claude-code.json` and `hooks/codex.json`.
 
-# Tab 2
-ssh gpu-box
-codex
-```
+## Shortcuts
 
-### tmux + SSH
+All bindings use `kitty_mod` (Kitty's cross-platform modifier — `ctrl+shift` on Linux by default).
 
-```bash
-# Tab 1
-ssh devbox
-tmux new -A -s ai
-claude
-
-# Tab 2
-ssh gpu-box
-tmux new -A -s ai
-codex
-```
-
-As long as the CLI is attached to the controlling TTY and your hooks are installed on the machine where the CLI runs, Kitty will receive the state updates.
-
-## Keybindings
-
-Added to `kitty.conf` by the installer:
+### Flat — highest frequency
 
 | Shortcut | Action |
 |---|---|
-| `Cmd+Shift+N` | Jump to next **waiting** tab |
-| `Cmd+Shift+R` | Jump to next **running** tab |
+| `kitty_mod+n` | Jump to next tab in `waiting` state |
 
-## State Model
+### Leader chord — `kitty_mod+a`, then…
 
-This project does not inspect terminal output and does not do pattern matching.
+| Key | Verb | Behavior |
+|---|---|---|
+| `c` | **create** | Prompt for name, spawn remote `tmux new -A -s <name> claude`, open a Kitty tab attached to it |
+| `a` | **connect_all** | For every live remote session not already a tab, open a tab attached to it |
+| `l` | **list / pick** | Numbered picker over `tmux ls`; selecting attaches in a new tab (or focuses an existing one) |
+| `k` | **kill** | Picker + confirm → `tmux kill-session -t <name>` on the remote |
+| `r` | **rename** | Rename the current tab and the matching remote session together |
+| `n` | jump waiting | Alternate access to `kitty_mod+n` |
+| `p` | jump running | Jump to next tab in `running` state |
 
-It only reacts to explicit `ai_cli_state` values emitted by your hooks:
+### Ending an agent (normal path)
 
-- `running` — work is in progress
-- `waiting` — the tool is blocked on your input
+Just exit it from inside — type `exit` or `Ctrl+D` in the agent's tab. The tmux session dies, the ssh drops, the tab closes. No shortcut needed; `kitty_mod+a k` is reserved for the forced case when you can't get into the session.
 
-If you emit any other value, the watcher clears the configured tab color.
+## Status Layer (existing)
 
-## Remote Setup Notes
+`ai_monitor.py` reacts to Kitty's `SetUserVar` escape sequence support:
 
-- If you run Claude or Codex over SSH, install the relevant hook config on the remote machine too.
-- If you use tmux remotely, no separate tmux config is required for this project; the provided hook commands already branch on `TMUX`.
-- If a tab does not update, test the raw escape sequence in that exact shell session and make sure it is writing to `/dev/tty`.
+```
+\033]1337;SetUserVar=ai_cli_state=<base64>\007
+```
 
-## Configuration
-
-Edit the top of `~/.config/kitty/ai_monitor.py`:
+The provided hooks emit this for `running` / `waiting` / `done` and detect `TMUX` so the sequence passes through tmux to Kitty. Colors:
 
 ```python
 STATE_COLORS = {
-    "waiting": "#00c800",   # Green
-    "running": "#ffb400",   # Orange
+    "waiting": "#00c800",   # Green  — needs input
+    "running": "#ffb400",   # Orange — working
 }
 ```
 
+Edit at the top of `~/.config/kitty/ai_monitor.py`.
+
+## Lifecycle Layer Files
+
+| File | Role |
+|---|---|
+| `agent_config.py` | `REMOTE_HOST`, default agent command. Env-var overridable. |
+| `agent_common.py` | Shared helpers: ssh, tmux ls, tab→session mapping, tab launcher. |
+| `agent_create.py` | Prompt → spawn + tab. |
+| `agent_connect_all.py` | Diff `tmux ls` against current tabs, open the missing ones. |
+| `agent_pick.py` | Picker → attach. |
+| `agent_end.py` | Picker + confirm → kill. |
+| `agent_rename.py` | Rename tab + remote session in lockstep. |
+
+## Scope
+
+This is a **personal workspace manager**, not a multi-agent runtime:
+
+- Each agent is isolated. No cross-session reads, writes, or messaging built in.
+- The human is the coordinator. If you want agents to talk to each other autonomously, build that on the Claude Agent SDK; this layer is just where you watch it run.
+
 ## Requirements
 
-- Kitty 0.30.0+ (for `on_set_user_var` watcher support)
+- Kitty 0.30.0+ (`on_set_user_var` watcher + `kitty @` remote control).
+- `tmux` on the remote.
+- SSH key auth to the remote.
 
 ## License
 
