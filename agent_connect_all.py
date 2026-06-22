@@ -33,11 +33,17 @@ def handle_result(args, answer, target_window_id, boss):
     from agent_common import (  # local import — boss process
         kitty_tabs_by_title,
         launch_agent_tab,
-        list_remote_sessions,
+        list_remote_sessions_result,
+        log_debug,
     )
 
+    result = list_remote_sessions_result()
+    if result.error:
+        log_debug("connect_all skipped: " + result.error)
+        return
+
     have = set(kitty_tabs_by_title(boss).keys())
-    for name in list_remote_sessions():
+    for name in result.sessions:
         if name in have:
             continue
         launch_agent_tab(boss, name, create=False)

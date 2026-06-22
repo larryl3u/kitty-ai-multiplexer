@@ -22,15 +22,16 @@ def ensure_config_dir_on_path():
 
 def main(args):
     ensure_config_dir_on_path()
-    from agent_common import list_remote_sessions
+    from agent_common import list_remote_sessions_result
 
-    sessions = list_remote_sessions()
+    result = list_remote_sessions_result()
+    sessions = result.sessions
     if not sessions:
-        print("No agent sessions on remote.")
-        try:
-            input("Press Enter to close…")
-        except (EOFError, KeyboardInterrupt):
-            pass
+        if result.error:
+            print("Could not list remote tmux sessions:")
+            print(result.error)
+        else:
+            print("No tmux sessions on remote. Use create first.")
         return ""
 
     for i, name in enumerate(sessions, 1):

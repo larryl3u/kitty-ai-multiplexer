@@ -10,12 +10,19 @@ import os
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from agent_config import REMOTE_HOST, AGENT_COMMAND  # noqa: E402
 
 SSH_TIMEOUT_SECONDS = 5
 LOG_PATH = "/tmp/kitty-ai-multiplexer.log"
+
+
+@dataclass
+class SessionList:
+    sessions: list
+    error: str = ""
 
 
 def ssh(*remote_argv, capture=True, check=False, timeout=SSH_TIMEOUT_SECONDS):
@@ -52,10 +59,24 @@ def ssh(*remote_argv, capture=True, check=False, timeout=SSH_TIMEOUT_SECONDS):
 
 def list_remote_sessions():
     """Live session names on the remote. Empty list on any error."""
+    return list_remote_sessions_result().sessions
+
+
+def list_remote_sessions_result():
+    """Live session names plus a diagnostic when the remote query fails."""
     r = ssh("tmux", "ls", "-F", "#{session_name}")
-    if r.returncode != 0:
-        return []
-    return [line.strip() for line in r.stdout.splitlines() if line.strip()]
+    if r.returncode == 0:
+        return SessionList(
+            [line.strip() for line in r.stdout.splitlines() if line.strip()]
+        )
+
+    err = ((r.stderr or "") + (r.stdout or "")).strip()
+    if "no server running" in err.lower() or "failed to connect to server" in err.lower():
+        return SessionList([])
+    if not err:
+        err = "ssh/tmux query failed with exit code {code}".format(code=r.returncode)
+    log_debug("list_remote_sessions failed: " + err)
+    return SessionList([], err)
 
 
 def kitty_tabs_by_title(boss):
