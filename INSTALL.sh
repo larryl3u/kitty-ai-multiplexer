@@ -24,6 +24,19 @@ fi
 
 mkdir -p "$KITTY_CONF_DIR"
 
+# Remote host. Reuses any previously-installed value so re-runs don't re-prompt.
+PREV_REMOTE=$(grep -E "^env KITTY_AGENT_REMOTE=" "$KITTY_CONF_DIR/kitty.conf" 2>/dev/null \
+              | tail -n1 | sed -E 's/^env KITTY_AGENT_REMOTE=//')
+DEFAULT_REMOTE="${KITTY_AGENT_REMOTE:-${PREV_REMOTE:-devbox}}"
+if [ -t 0 ]; then
+    printf "Remote host (ssh target for agent sessions) [%s]: " "$DEFAULT_REMOTE"
+    read -r REMOTE_INPUT
+    REMOTE_HOST="${REMOTE_INPUT:-$DEFAULT_REMOTE}"
+else
+    REMOTE_HOST="$DEFAULT_REMOTE"
+fi
+echo "Using remote: $REMOTE_HOST"
+
 for f in ai_monitor.py ai_jump.py \
          agent_config.py agent_common.py \
          agent_create.py agent_connect_all.py \
@@ -46,6 +59,10 @@ fi
 cat >> "$KITTY_CONF" <<EOF
 
 $MARK_BEGIN
+# Remote host for agent_* kittens. Edit and reload Kitty to change, or
+# re-run INSTALL.sh to be prompted again.
+env KITTY_AGENT_REMOTE=$REMOTE_HOST
+
 # Status layer: AI CLI state → tab color
 watcher $KITTY_CONF_DIR/ai_monitor.py
 
@@ -77,11 +94,9 @@ echo "Updated managed block in $KITTY_CONF"
 cat <<EOF
 
 Next steps:
-  1. Set the remote host (one of):
-       export KITTY_AGENT_REMOTE=devbox      # in your shell rc
-       # or edit $KITTY_CONF_DIR/agent_config.py
-  2. Restart Kitty (or ctrl+shift+f5 to reload config).
-  3. Install AI tool hooks (see hooks/claude-code.json and hooks/codex.json).
+  1. Restart Kitty (or ctrl+shift+f5 to reload config).
+     Kitty will export KITTY_AGENT_REMOTE=$REMOTE_HOST to all kittens.
+  2. Install AI tool hooks (see hooks/claude-code.json and hooks/codex.json).
 
 Shortcuts:
   kitty_mod+n        jump to next waiting tab
