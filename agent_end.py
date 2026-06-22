@@ -12,10 +12,19 @@ Bound in kitty.conf, e.g.:
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from kitty.constants import config_dir as KITTY_CONFIG_DIR
+except Exception:
+    KITTY_CONFIG_DIR = os.environ.get("KITTY_CONFIG_DIRECTORY", "")
+
+
+def ensure_config_dir_on_path():
+    if KITTY_CONFIG_DIR and KITTY_CONFIG_DIR not in sys.path:
+        sys.path.insert(0, KITTY_CONFIG_DIR)
 
 
 def main(args):
+    ensure_config_dir_on_path()
     from agent_common import list_remote_sessions
 
     sessions = list_remote_sessions()
@@ -59,6 +68,7 @@ def handle_result(args, answer, target_window_id, boss):
     name = (answer or "").strip()
     if not name:
         return
+    ensure_config_dir_on_path()
     from agent_common import ssh
 
     ssh("tmux", "kill-session", "-t", name)

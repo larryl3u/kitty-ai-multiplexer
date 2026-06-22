@@ -9,7 +9,15 @@ Bound in kitty.conf, e.g.:
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from kitty.constants import config_dir as KITTY_CONFIG_DIR
+except Exception:
+    KITTY_CONFIG_DIR = os.environ.get("KITTY_CONFIG_DIRECTORY", "")
+
+
+def ensure_config_dir_on_path():
+    if KITTY_CONFIG_DIR and KITTY_CONFIG_DIR not in sys.path:
+        sys.path.insert(0, KITTY_CONFIG_DIR)
 
 
 def main(args):
@@ -34,6 +42,7 @@ def handle_result(args, answer, target_window_id, boss):
         return
     old_name = getattr(tab, "name", "") or getattr(tab, "title", "") or ""
 
+    ensure_config_dir_on_path()
     from agent_common import boss_rc, ssh
 
     if old_name and old_name != new_name:

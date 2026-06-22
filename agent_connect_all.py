@@ -10,7 +10,15 @@ Bound in kitty.conf, e.g.:
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from kitty.constants import config_dir as KITTY_CONFIG_DIR
+except Exception:
+    KITTY_CONFIG_DIR = os.environ.get("KITTY_CONFIG_DIRECTORY", "")
+
+
+def ensure_config_dir_on_path():
+    if KITTY_CONFIG_DIR and KITTY_CONFIG_DIR not in sys.path:
+        sys.path.insert(0, KITTY_CONFIG_DIR)
 
 from kittens.tui.handler import result_handler  # noqa: E402
 
@@ -21,6 +29,7 @@ def main(args):
 
 @result_handler(no_ui=True)
 def handle_result(args, answer, target_window_id, boss):
+    ensure_config_dir_on_path()
     from agent_common import (  # local import — boss process
         kitty_tabs_by_title,
         launch_agent_tab,
